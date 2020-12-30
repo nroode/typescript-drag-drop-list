@@ -1,8 +1,22 @@
+enum ProjectStatus { Active, Finished }
+
+class Project {
+    constructor(
+        public id: string, 
+        public title: string,
+        public description: string, 
+        public people: number, 
+        public status: ProjectStatus,
+        ) {}
+}
+
 // project state management
 
+type Listener = ( items: Project[] ) => void;
+
 class ProjectState {
-    private listeners: any[] = [];
-    private projects: any[] = [];
+    private listeners: Listener[] = [];
+    private projects: Project[] = [];
     private static instance: ProjectState;
 
     private constructor() {
@@ -17,17 +31,18 @@ class ProjectState {
         return this.instance;
     }
 
-    addListener( listenerFn: Function ) {
+    addListener(listenerFn: Listener) {
         this.listeners.push(listenerFn);
     }
 
-    addProject( title: string, description: string, numOfPeople: number ){
-        const newProject = {
-            id: Math.random().toString,
-            title: title,
-            description: description,
-            people: numOfPeople
-        };
+    addProject(title: string, description: string, numOfPeople: number) {
+        const newProject = new Project(
+            Math.random().toString(),
+            title,
+            description,
+            numOfPeople,
+            ProjectStatus.Active
+        );
         this.projects.push(newProject);
         for (const listenerFn of this.listeners) {
             listenerFn(this.projects.slice())
@@ -50,19 +65,19 @@ interface Validatable {
 
 function validate(validatableInput: Validatable) {
     let isValid = true;
-    if (validatableInput.required){
+    if (validatableInput.required) {
         isValid = isValid && validatableInput.value.toString().trim().length !== 0;
     }
-    if (validatableInput.minLength != null && typeof validatableInput.value === 'string'){
+    if (validatableInput.minLength != null && typeof validatableInput.value === 'string') {
         isValid = isValid && validatableInput.value.length >= validatableInput.minLength;
     }
-    if (validatableInput.maxLength != null && typeof validatableInput.value === 'string'){
+    if (validatableInput.maxLength != null && typeof validatableInput.value === 'string') {
         isValid = isValid && validatableInput.value.length <= validatableInput.maxLength;
     }
-    if (validatableInput.min != null && typeof validatableInput.value === 'number'){
+    if (validatableInput.min != null && typeof validatableInput.value === 'number') {
         isValid = isValid && validatableInput.value >= validatableInput.min;
     }
-    if (validatableInput.max != null && typeof validatableInput.value === 'number'){
+    if (validatableInput.max != null && typeof validatableInput.value === 'number') {
         isValid = isValid && validatableInput.value <= validatableInput.max;
     }
     return isValid;
@@ -86,7 +101,7 @@ class ProjectList {
     templateElement: HTMLTemplateElement;
     hostElement: HTMLDivElement;
     element: HTMLElement;
-    assignedProjects: any[];
+    assignedProjects: Project[];
 
     constructor(private type: 'active' | 'finished') {
         this.templateElement = document.getElementById("project-list")! as HTMLTemplateElement;
@@ -96,19 +111,26 @@ class ProjectList {
         const importedNode = document.importNode(this.templateElement.content, true);
         this.element = importedNode.firstElementChild as HTMLElement;
         this.element.id = `${this.type}-projects`;
-        
-        projectState.addListener((projects: any[]) => {
-            this.assignedProjects = projects;
+
+        projectState.addListener((projects: Project[]) => {
+            const relevantProjects = projects.filter(project => {
+                if (this.type === 'active') {
+                    return project.status === ProjectStatus.Active;
+                }
+                return project.status === ProjectStatus.Finished
+            });
+            this.assignedProjects = relevantProjects;
             this.renderProjects();
         });
-        
+
         this.attach();
         this.renderContent();
     }
 
-    private renderProjects(){
+    private renderProjects() {
         const listEl = document.getElementById(`${this.type}-projects-list`)! as HTMLUListElement;
-        for (const prjItem of this.assignedProjects ){
+        listEl.innerHTML = '';
+        for (const prjItem of this.assignedProjects) {
             const listItem = document.createElement("li");
             listItem.textContent = prjItem.title;
             listEl.appendChild(listItem);
@@ -176,7 +198,7 @@ class ProjectInput {
         if (
             !validate(titleValidatable) ||
             !validate(descriptionValidatable) ||
-            !validate(peopleValidatable) 
+            !validate(peopleValidatable)
         ) {
             alert('invalud input, please try again!');
             return;
@@ -196,7 +218,7 @@ class ProjectInput {
     private submitHandler(event: Event) {
         event.preventDefault();
         const userInput = this.gatherUserInput();
-        if (Array.isArray(userInput)){
+        if (Array.isArray(userInput)) {
             const [title, desc, people] = userInput;
             projectState.addProject(title, desc, people);
             this.clearInputs();
